@@ -1,0 +1,15 @@
+name: fapi
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - sqlmodel
+  - sqlalchemy
+  - pydantic
+  - pip
+  - pip:
+      - fastapi[all]
+      - uvicorn
+      - gunicorn
+      - timescaledb
+     
