@@ -1,50 +1,68 @@
-from fastapi import APIRouter
-from .schemas import EventSchema,EventListSchema,EventUpdateSchema
+from fastapi import APIRouter,Depends, HTTPException
+from .models import EventModel,EventListModel,EventUpdateModel,EventCreateModel
+from sqlmodel import Session,select
+from ..db.config import DATABASE_URL
+from src.api.db.session import get_session
+
 router = APIRouter()
 
 
 # get data
-@router.get("/")
-async def read_events()-> EventListSchema:
+@router.get("/",response_model=EventListModel)
+async def read_events(session:Session = Depends(get_session)):
+    
+    query = select(EventModel)
+    results = session.exec(query).all()
     return{
-        "results": [{"id":1},{"id":2},{"id":3}],
-        "count":3
+        "results": results,
+        "count":len(results)
     }
 
 
 
 # create data
-@router.post("/")
-async def create_event(data:dict={})-> EventSchema:
-
+@router.post("/",response_model=EventModel)
+async def create_event(data:EventCreateModel,
+                        session:Session = Depends(get_session)):
+  
     # a bunch of items in the table
-    print(data)
-    print(type(data))
-    return {"id":123}
+    obj = EventModel.model_validate(data)
+    session.add(obj)
+    session.commit()
+    session.refresh(obj)
+    return obj
    
 
 #get data with a reference
-@router.get("/{event_id}")
-async def get_event(event_id: int) -> EventSchema:
-    return {"id":event_id}
+@router.get("/{event_id}",response_model=EventModel)
+async def get_event(event_id: int, session:Session = Depends(get_session)):
+
+    obj = session.get(EventModel,event_id)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return obj
 
 #update data with a reference
-@router.put("/{event_id}")
-async def update_event(event_id: int, data: EventUpdateSchema) -> EventUpdateSchema:
+@router.put("/{event_id}",response_model=EventModel)
+async def update_event(event_id: int, data: EventUpdateModel, session:Session = Depends(get_session)):
 
-    description = 'Zephyr Song'
-    rating = 9.0
-    print(f'Before Updation - Description = {description}, Rating = {rating}')
+
+    obj = session.get(EventModel, event_id)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    print(f"Before Updation - Description = {obj.description}, Rating = {obj.rating}")
    
-    print(data)
+    
+    update_data = data.model_dump(exclude_unset=True)
+    for key,val in update_data.items():
+        setattr(obj,key,val)
 
-    #pydantic approach
-    description = data.description
-    rating = data.rating
+    session.add(obj)
+    session.commit()
+    session.refresh(obj)
 
-    #to dict approach
-    # data = data.model_dump()
-    # description = data['description']
-    # rating = data['rating']
-    print(f'After Updation - Description = {description}, Rating = {rating}')
-    return {"id":event_id,"description":description,"rating":rating}
+
+    
+    print(f"After Updation - Description = {obj.description}, Rating = {obj.rating}")
+    return obj

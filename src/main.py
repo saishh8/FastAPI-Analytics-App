@@ -1,10 +1,21 @@
 from typing import Union
-
+# from sqlmodel import Session
 from fastapi import FastAPI
 from pydantic import BaseModel
 from src.api.events import router as event_router
+from contextlib import asynccontextmanager
+from src.api.db.session import init_db
+# from src.api.db.session import get_session
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app:FastAPI):
+    # before app startup
+    init_db()
+    yield
+    #cleanup
+
+app = FastAPI(lifespan=lifespan)
 app.include_router(event_router, prefix="/api/events")
 
 
